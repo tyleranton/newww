@@ -19,8 +19,6 @@ bole.output({
 
 
 // leak detection
-memwatch.setup();
-
 var heapdump;
 memwatch.on('leak', function(info) {
   log.warn('Memory leak detected: ', info);
