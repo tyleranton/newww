@@ -26,6 +26,8 @@ describe("package handler", function(){
       .reply(200, fixtures.packages.browserify)
       .get('/package?dependency=browserify&limit=50').twice()
       .reply(200, fixtures.dependents)
+      .get('/package?dependency=%40zeke%2Fsecrets&limit=50')
+      .reply(200)
       .get('/package/nothingness')
       .reply(404)
       .get('/package/@zeke%2Fnope').twice()
@@ -36,6 +38,8 @@ describe("package handler", function(){
       .reply(404)
       .get('/package/hitler')
       .reply(200, fixtures.packages.hitler)
+      .get('/package?dependency=hitler&limit=50')
+      .reply(200)
       .get('/package/request').times(4)
       .reply(200, fixtures.packages.request)
       .get('/package?dependency=request&limit=50').times(4)
@@ -53,7 +57,13 @@ describe("package handler", function(){
       .get('/point/last-week/request').twice()
       .reply(200, fixtures.downloads.request.week)
       .get('/point/last-month/request').twice()
-      .reply(200, fixtures.downloads.request.month);
+      .reply(200, fixtures.downloads.request.month)
+      .get('/point/last-day/request').twice()
+      .reply(404)
+      .get('/point/last-week/request').twice()
+      .reply(404)
+      .get('/point/last-month/request').twice()
+      .reply(404);
 
     userMock = nock("https://user-api-example.com")
       .get('/user/bob').times(3)
@@ -167,11 +177,11 @@ describe("package handler", function(){
     before(function(done){
       var packageMock = nock("https://user-api-example.com")
         .get('/package/@zeke%2Fsecrets')
-        .reply(402)
+        .reply(402);
 
       server.inject(options, function (response) {
-        packageMock.done()
-        resp = response
+        packageMock.done();
+        resp = response;
         done();
       });
     });
@@ -179,12 +189,12 @@ describe("package handler", function(){
     it('redirects to the billing page', function (done) {
       expect(resp.statusCode).to.equal(302);
       expect(URL.parse(resp.headers.location).pathname).to.equal("/settings/billing");
-      done()
+      done();
     });
 
     it('sets a `package` query param so a helpful message can be displayed', function (done) {
       expect(URL.parse(resp.headers.location, true).query.package).to.equal("@zeke/secrets");
-      done()
+      done();
     });
 
   });
@@ -247,8 +257,8 @@ describe("package handler", function(){
     });
 
     it('encourages user to try logging in for access', function (done) {
-      expect($("hgroup h2").length).to.equal(1);
-      expect($("hgroup h2").text()).to.include("try logging in");
+      expect($(".content h2").length).to.equal(1);
+      expect($(".content h2").text()).to.include("try logging in");
       done();
     });
   });
@@ -278,8 +288,8 @@ describe("package handler", function(){
     });
 
     it("tells user that package exist but they don't have access", function (done) {
-      expect($("hgroup h2").length).to.equal(1);
-      expect($("hgroup h2").text()).to.include("you may not have permission");
+      expect($(".content h2").length).to.equal(1);
+      expect($(".content h2").text()).to.include("you may not have permission");
       done();
     });
 

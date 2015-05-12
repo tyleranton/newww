@@ -69,6 +69,27 @@ describe('lib/cache.js', function()
         });
     });
 
+    describe('redis errors', function ()
+    {
+        it('logs on error', function (done)
+        {
+            sinon.spy(cache.logger, 'error');
+            cache.redis.emit('error', new Error('my little pony'));
+            expect(cache.logger.error.calledWith('cache redis connection lost; reconnecting')).to.be.true();
+            cache.logger.error.restore();
+            done();
+        });
+
+        it('reconnects on error', function (done)
+        {
+            cache.redis.on('reconnecting', function () {
+                expect(true).to.be.true();
+                done();
+            });
+            cache.redis.stream.emit('error', new Error('my little pony'));
+        });
+    });
+
     describe('_fingerprint()', function()
     {
         it('returns an md5 hash prefixed by the key prefix', function(done)
@@ -145,6 +166,11 @@ describe('lib/cache.js', function()
         {
             sinon.spy(cache.redis, 'get');
             var opts = {url: 'https://google.com/'};
+
+            var mock = nock('https://google.com')
+                .get('/')
+                .reply(200);
+
             var fingerprint = cache._fingerprint(opts);
 
             cache.get(opts, function(err, data)
@@ -152,6 +178,7 @@ describe('lib/cache.js', function()
                 expect(cache.redis.get.calledOnce).to.equal(true);
                 expect(cache.redis.get.calledWith(fingerprint)).to.equal(true);
                 cache.redis.get.restore();
+                mock.done();
                 done();
             });
         });
@@ -212,11 +239,16 @@ describe('lib/cache.js', function()
               url: 'https://logging.com/'
           };
 
+          var mock = nock('https://logging.com')
+              .get('/')
+              .reply(200);
+
           cache.get(opts, function(err, data)
           {
               expect(cache.logger.error.calledTwice).to.equal(true);
               expect(cache.logger.error.calledWithMatch(/problem getting/)).to.equal(true);
               cache.logger.error.restore();
+              mock.done();
               done();
           });
         });

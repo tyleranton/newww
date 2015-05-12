@@ -1,5 +1,6 @@
 var billing = module.exports = {};
 var Customer = require("../models/customer").new();
+var utils = require('../lib/utils');
 
 billing.getBillingInfo = function (request, reply) {
 
@@ -18,7 +19,7 @@ billing.getBillingInfo = function (request, reply) {
   // Display a message to unpaid collaborators about the
   // package they could be accessing if they paid for it
   if (request.query.package) {
-    opts.package = request.query.package
+    opts.package = request.query.package;
   }
 
   Customer.get(request.loggedInUser.name, function(err, customer) {
@@ -31,7 +32,6 @@ billing.getBillingInfo = function (request, reply) {
 };
 
 billing.updateBillingInfo = function(request, reply) {
-
   if (!request.features.billing_page) {
     return reply.view('errors/not-found').code(404);
   }
@@ -41,16 +41,28 @@ billing.updateBillingInfo = function(request, reply) {
   var billingInfo = {
     name: request.loggedInUser.name,
     email: request.loggedInUser.email,
-    card: request.payload.stripeToken
+    card: request.payload.stripeToken,
+    coupon: request.payload.coupon
   };
 
   Customer.update(billingInfo, function(err, customer) {
+    var opts = {};
+
     if (err) {
-      request.logger.error(err);
-      return reply.view('errors/internal').code(500);
+      opts.errors = [];
+      opts.errors.push(new Error(err));
+      return reply.view('user/billing', opts);
     }
 
-    sendToHubspot(process.env.HUBSPOT_FORM_PRIVATE_NPM_SIGNUP, {email: billingInfo.email}, function (er) {
+    var data = {
+      hs_context: {
+        pageName: "customer-billing-update",
+        ipAddress: utils.getUserIP(request)
+      },
+      email: billingInfo.email
+    };
+
+    sendToHubspot(process.env.HUBSPOT_FORM_PRIVATE_NPM_SIGNUP, data, function (er) {
       if (er) {
         request.logger.error('unable to send billing email to HubSpot');
         request.logger.error(er);

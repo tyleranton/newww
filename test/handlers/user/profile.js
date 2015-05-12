@@ -33,7 +33,7 @@ describe('GET /~bob for a user other than bob', function () {
     var mock = nock("https://user-api-example.com")
       .get('/user/bob')
       .reply(200, users.bob)
-      .get('/user/bob/package?format=detailed&per_page=9999')
+      .get('/user/bob/package?format=mini&per_page=100&page=0')
       .reply(200, users.packages)
       .get('/user/bob/stars?format=detailed')
       .reply(200, users.stars);
@@ -96,7 +96,7 @@ describe('GET /~bob for logged-in bob', function () {
     var mock = nock("https://user-api-example.com")
       .get('/user/bob').times(2)
       .reply(200, users.bob)
-      .get('/user/bob/package?format=detailed&per_page=9999')
+      .get('/user/bob/package?format=mini&per_page=100&page=0')
       .reply(200, users.packages)
       .get('/user/bob/stars?format=detailed')
       .reply(200, users.stars);
@@ -111,23 +111,23 @@ describe('GET /~bob for logged-in bob', function () {
     });
   });
 
-  it("renders a blurb about how bob can edit his profile", function(done){
-    expect($("p.notice.profile-edit").length).to.equal(1);
+  it("renders a link to billing page", function(done){
+    expect($(".profile-edit-links a[href='/settings/billing']").length).to.equal(1);
     done();
   });
 
   it("renders a link to profile edit page", function(done){
-    expect($("p.profile-edit a[href='/profile-edit']").length).to.equal(1);
+    expect($(".profile-edit-links a[href='/profile-edit']").length).to.equal(1);
     done();
   });
 
   it("renders a link to change password page", function(done){
-    expect($("p.profile-edit a[href='/password']").length).to.equal(1);
+    expect($(".profile-edit-links a[href='/password']").length).to.equal(1);
     done();
   });
 
   it("renders a link to change gravatar", function(done){
-    expect($("p.profile-edit a[href='http://gravatar.com/emails/']").length).to.equal(1);
+    expect($(".profile-edit-links a[href='http://gravatar.com/emails/']").length).to.equal(1);
     done();
   });
 

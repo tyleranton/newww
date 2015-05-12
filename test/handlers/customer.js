@@ -13,17 +13,23 @@ var generateCrumb = require("../handlers/crumb.js"),
     server,
     fixtures = require('../fixtures');
 
-var userMock;
+var userMock, licenseMock;
 
 before(function (done) {
-  process.env.FEATURE_BILLING_PAGE = 'true'
+  process.env.FEATURE_BILLING_PAGE = 'true';
   userMock = nock("https://user-api-example.com")
-    .get("/user/bob").times(14)
+    .get("/user/bob").times(16)
     .reply(200, fixtures.users.bob)
     .get("/user/diana_delinquent").twice()
     .reply(200, fixtures.users.diana_delinquent)
     .get("/user/norbert_newbie").times(3)
     .reply(200, fixtures.users.norbert_newbie);
+
+  licenseMock = nock("https://license-api-example.com:443")
+    .get("/stripe/bob")
+    .reply(200, fixtures.customers.happy)
+    .get("/stripe/bob").times(6)
+    .reply(404);
 
   require('../mocks/server')(function (obj) {
     server = obj;
@@ -32,8 +38,9 @@ before(function (done) {
 });
 
 after(function (done) {
-  delete process.env.FEATURE_BILLING_PAGE
+  delete process.env.FEATURE_BILLING_PAGE;
   userMock.done();
+  licenseMock.done();
   server.stop(done);
 });
 
@@ -81,6 +88,36 @@ describe('GET /settings/billing', function () {
       expect(resp.request.response.source.context.updated).to.be.true();
       var $ = cheerio.load(resp.result);
       expect($(".update-notice").text()).to.include('successfully updated');
+      done();
+    });
+  });
+
+  it("renders a twitter tracking snippet for 'private modules purchase'", function (done) {
+    var options = {
+      method: "get",
+      url: "/settings/billing?updated=1",
+      credentials: fixtures.users.bob
+    };
+
+    server.inject(options, function (resp) {
+      var $ = cheerio.load(resp.result);
+      expect($("script[src='//platform.twitter.com/oct.js'][data-twitter-pid='l5xyy']").length).to.equal(1);
+      expect($("noscript img[src^='//t.co/i/adsct?txn_id=l5xyy']").length).to.equal(1);
+      done();
+    });
+  });
+
+  it("renders a twitter tracking snippet for 'private modules billing signup page'", function (done) {
+    var options = {
+      method: "get",
+      url: "/settings/billing",
+      credentials: fixtures.users.bob
+    };
+
+    server.inject(options, function (resp) {
+      var $ = cheerio.load(resp.result);
+      expect($("script[src='//platform.twitter.com/oct.js'][data-twitter-pid='l5xz2']").length).to.equal(1);
+      expect($("noscript img[src^='//t.co/i/adsct?txn_id=l5xz2']").length).to.equal(1);
       done();
     });
   });
@@ -279,15 +316,15 @@ describe('GET /settings/billing', function () {
       var options = {
         url: "/settings/billing",
         credentials: fixtures.users.uncle_unverified
-      }
+      };
 
       var userMock = nock("https://user-api-example.com")
         .get("/user/uncle_unverified")
-        .reply(200, fixtures.users.uncle_unverified)
+        .reply(200, fixtures.users.uncle_unverified);
 
       var customerMock = nock("https://license-api-example.com")
         .get("/stripe/uncle_unverified")
-        .reply(404)
+        .reply(404);
 
       server.inject(options, function (response) {
         resp = response;
@@ -363,6 +400,39 @@ describe('POST /settings/billing', function () {
 
     });
 
+    it('bubbles billing issues up to the user', function (done) {
+
+      generateCrumb(server, function (crumb){
+        var opts = {
+          url: '/settings/billing',
+          method: 'POST',
+          credentials: fixtures.users.bob,
+          payload: {
+            stripeToken: 'tok_1234567890',
+            crumb: crumb
+          },
+          headers: { cookie: 'crumb=' + crumb }
+        };
+
+        var mock = nock("https://license-api-example.com")
+          .get("/stripe/bob")
+          .reply(200, fixtures.customers.happy)
+          .post("/stripe/bob")
+          .reply(200, "Your card's security code is incorrect.");
+
+        server.inject(opts, function (resp) {
+          mock.done();
+          expect(resp.statusCode).to.equal(200);
+          expect(resp.request.response.source.template).to.equal('user/billing');
+          var $ = cheerio.load(resp.result);
+          expect($('.errors li')[0].children.length).to.equal(1);
+          expect($('.errors li')[0].children[0].data).to.equal("Error: Your card's security code is incorrect.");
+          done();
+        });
+      });
+
+    });
+
   });
 
   describe("new paid user", function() {
@@ -428,19 +498,24 @@ describe('POST /settings/billing/cancel', function () {
       var opts = {
         method: 'post',
         url: '/settings/billing/cancel',
-        credentials: fixtures.users.bob,
         payload: {
           crumb: crumb
         },
-        headers: { cookie: 'crumb=' + crumb }
+        headers: { cookie: 'crumb=' + crumb },
+        credentials: fixtures.users.bob
       };
 
-      var mock = nock("https://license-api-example.com")
+      var licenseMock = nock("https://license-api-example.com")
         .delete("/stripe/bob")
         .reply(200, fixtures.customers.happy);
 
+      var userMock = nock("https://user-api-example.com")
+        .get("/user/bob")
+        .reply(200, fixtures.users.bob);
+
       server.inject(opts, function (resp) {
-        mock.done();
+        licenseMock.done();
+        userMock.done();
         expect(resp.statusCode).to.equal(302);
         expect(resp.headers.location).to.match(/\/settings\/billing\?canceled=1$/);
         done();

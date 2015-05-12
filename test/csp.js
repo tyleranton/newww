@@ -30,6 +30,11 @@ describe("csp (content security policy)", function () {
         done();
       })
 
+      it("allows twitter tracking", function (done) {
+        expect(csp.default.scriptSrc).to.include('https://platform.twitter.com/oct.js');
+        done();
+      })
+
       it("does not allow unsafe-inline", function (done) {
         expect(csp.default.scriptSrc).to.not.include('unsafe-inline');
         done();
@@ -42,8 +47,8 @@ describe("csp (content security policy)", function () {
     })
 
     describe("frameSrc", function(){
-      it("only has one allowance", function (done) {
-        expect(csp.default.frameSrc.length).to.equal(1)
+      it("has three allowances", function (done) {
+        expect(csp.default.frameSrc.length).to.equal(3)
         done();
       })
 
@@ -51,6 +56,17 @@ describe("csp (content security policy)", function () {
         expect(csp.default.frameSrc).to.include('https://checkout.stripe.com');
         done();
       })
+
+      it("allows js.stripe.com", function (done) {
+        expect(csp.default.frameSrc).to.include('https://js.stripe.com');
+        done();
+      })
+
+      it("allows www.youtube.com", function (done) {
+        expect(csp.default.frameSrc).to.include('https://www.youtube.com');
+        done();
+      })
+
     })
 
   })

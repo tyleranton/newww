@@ -4,7 +4,7 @@ var decorate = require(__dirname + '/../presenters/user');
 var fmt = require('util').format;
 var mailchimp = require('mailchimp-api');
 var P = require('bluebird');
-var request = require('request');
+var Request = require('../lib/external-request');
 var userValidate = require('npm-user-validate');
 
 var chimp;
@@ -32,7 +32,6 @@ User.new = function(request) {
 
 User.prototype.confirmEmail = function (user, callback) {
   var url = fmt('%s/user/%s/verify', this.host, user.name);
-  this.log(url);
 
   return new P(function(resolve, reject) {
     var opts = {
@@ -43,7 +42,7 @@ User.prototype.confirmEmail = function (user, callback) {
       }
     };
 
-    request.post(opts, function (err, resp, body) {
+    Request.post(opts, function (err, resp, body) {
       if (err) { return reject(err); }
       if (resp.statusCode > 399) {
         err = Error('error verifying user ' + user.name);
@@ -59,7 +58,7 @@ User.prototype.login = function(loginInfo, callback) {
   var url = fmt('%s/user/%s/login', this.host, loginInfo.name);
 
   return new P(function (resolve, reject) {
-    request.post({
+    Request.post({
       url: url,
       json: true,
       body: {
@@ -106,45 +105,49 @@ User.prototype.get = function(name, options, callback) {
     options = {};
   }
 
-  return new P(function(resolve, reject) {
-      cache.get(_this.generateUserACLOptions(name), function(err, body){
-        if (err) { return reject(err); }
-        return resolve(body);
-      });
-  })
-  .then(function(_user){
+  return cache.getP(_this.generateUserACLOptions(name))
+  .then(function(_user) {
     user = decorate(_user);
+    var actions = {};
+    if (options.stars) { actions.stars = _this.getStars(user.name); }
+    if (options.packages) { actions.packages = _this.getPackages(user.name, 0); }
 
-    return options.stars ? _this.getStars(user.name) : null;
+    return P.props(actions);
   })
-  .then(function(_stars){
-    if (_stars) { user.stars = _stars; }
-    return options.packages ? _this.getPackages(user.name) : null;
-  })
-  .then(function(_packages){
-    if (_packages) { user.packages = _packages; }
+  .then(function(results) {
+    user.stars = results.stars;
+    user.packages = results.packages;
+
     return user;
   })
   .nodeify(callback);
 };
 
-User.prototype.getPackages = function(name, callback) {
+User.prototype.getPackages = function(name, page, callback) {
   var _this = this;
   var url = fmt('%s/user/%s/package', this.host, name);
 
+  if (typeof page === 'function' || typeof page === 'undefined') {
+    callback = page;
+    page = 0;
+  }
+
   return new P(function(resolve, reject) {
+    var PER_PAGE = 100;
+
     var opts = {
       url: url,
       qs: {
-        format: 'detailed',
-        per_page: 9999
+        format: 'mini',
+        per_page: PER_PAGE,
+        page: page
       },
       json: true
     };
 
     if (_this.bearer) { opts.headers = {bearer: _this.bearer}; }
 
-    request.get(opts, function(err, resp, body){
+    Request.get(opts, function(err, resp, body){
 
       if (err) { return reject(err); }
       if (resp.statusCode > 399) {
@@ -152,6 +155,13 @@ User.prototype.getPackages = function(name, callback) {
         err.statusCode = resp.statusCode;
         return reject(err);
       }
+
+      var num = _.get(body, 'items.length');
+
+      if (+num * (+page + 1) < body.count && num >= PER_PAGE) {
+        body.hasMore = true;
+      }
+
       return resolve(body);
     });
   }).nodeify(callback);
@@ -169,7 +179,7 @@ User.prototype.getStars = function(name, callback) {
 
     if (_this.bearer) { opts.headers = {bearer: _this.bearer}; }
 
-    request.get(opts, function(err, resp, body){
+    Request.get(opts, function(err, resp, body){
 
       if (err) { return reject(err); }
       if (resp.statusCode > 399) {
@@ -183,16 +193,12 @@ User.prototype.getStars = function(name, callback) {
   .nodeify(callback);
 };
 
-User.prototype.log = function(msg) {
-  if (this.debug) { this.logger.info(msg); }
-};
-
 User.prototype.login = function(loginInfo, callback) {
   var url = fmt('%s/user/%s/login', this.host, loginInfo.name);
 
   return new P(function (resolve, reject) {
 
-    request.post({
+    Request.post({
       url: url,
       json: true,
       body: {
@@ -226,14 +232,13 @@ User.prototype.lookupEmail = function(email, callback) {
     if (userValidate.email(email)) {
       var err = new Error('email is invalid');
       err.statusCode = 400;
-      _this.log(err);
+      _this.logger.error(err);
       return reject(err);
     }
 
     var url = _this.host + '/user/' + email;
-    _this.log(url);
 
-    request.get({url: url, json: true}, function (err, resp, body) {
+    Request.get({url: url, json: true}, function (err, resp, body) {
       if (err) { return reject(err); }
       if (resp.statusCode > 399) {
         err = Error('error looking up username(s) for ' + email);
@@ -256,7 +261,7 @@ User.prototype.save = function (user, callback) {
       body: user
     };
 
-    request.post(opts, function (err, resp, body) {
+    Request.post(opts, function (err, resp, body) {
       if (err) { return reject(err); }
       if (resp.statusCode > 399) {
         err = Error('error updating profile for ' + user.name);
@@ -292,7 +297,7 @@ User.prototype.signup = function (user, callback) {
       json: true
     };
 
-    request.put(opts, function (err, resp, body) {
+    Request.put(opts, function (err, resp, body) {
       if (err) { return reject(err); }
       if (resp.statusCode > 399) {
         err = Error('error creating user ' + user.name);
