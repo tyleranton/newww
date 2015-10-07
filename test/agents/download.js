@@ -8,7 +8,7 @@ var Code = require('code'),
   expect = Code.expect,
   nock = require("nock"),
   fixtures = require("../fixtures"),
-  Download = require("../../models/download");
+  Download = require("../../agents/download");
 
 describe("Download", function() {
 

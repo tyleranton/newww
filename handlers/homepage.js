@@ -1,5 +1,5 @@
 var P = require('bluebird');
-var Download = require("../models/download");
+var Download = require("../agents/download");
 var feature = require('../lib/feature-flags.js');
 
 var MINUTE = 60; // seconds
