@@ -1,9 +1,10 @@
 var _ = require('lodash');
-var P = require('bluebird');
-var validate = require('validate-npm-package-name');
-var npa = require('npm-package-arg');
-var PackageModel = require("../models/package");
+var Download = require("../models/download");
 var feature = require('../lib/feature-flags');
+var npa = require('npm-package-arg');
+var P = require('bluebird');
+var PackageModel = require("../models/package");
+var validate = require('validate-npm-package-name');
 
 var DEPENDENCY_TTL = 5 * 60; // 5 minutes
 
@@ -13,10 +14,6 @@ exports.show = function(request, reply) {
     title: name
   };
   var loggedInUser = request.loggedInUser;
-  var Download = require("../models/download").new({
-    request: request,
-    cache: require("../lib/cache")
-  });
   var Package = PackageModel.new(request);
 
   request.logger.info('get package: ' + name);
@@ -28,7 +25,7 @@ exports.show = function(request, reply) {
     limit: 50
   }, DEPENDENCY_TTL);
   if (!feature('npmo')) {
-    actions.downloads = Download.getAll(name);
+    actions.downloads = Download().getAll(name);
   }
 
   P.props(actions)

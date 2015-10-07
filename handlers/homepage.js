@@ -1,5 +1,5 @@
 var P = require('bluebird');
-
+var Download = require("../models/download");
 var feature = require('../lib/feature-flags.js');
 
 var MINUTE = 60; // seconds
@@ -8,10 +8,6 @@ var DEPENDENTS_TTL = 30 * MINUTE;
 
 module.exports = function(request, reply) {
   var Package = require("../models/package").new(request);
-  var Download = require("../models/download").new({
-    request: request,
-    cache: require("../lib/cache")
-  });
   var context = {
     explicit: require("npm-explicit-installs")
   };
@@ -28,7 +24,7 @@ module.exports = function(request, reply) {
   }, DEPENDENTS_TTL);
 
   if (!feature('npmo')) {
-    actions.downloads = Download.getAll();
+    actions.downloads = Download().getAll();
     actions.totalPackages = Package.count().catch(function(err) {
       request.logger.error(err);
       return null;

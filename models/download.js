@@ -1,22 +1,20 @@
-var P = require('bluebird');
 var _ = require('lodash');
+var DOWNLOADS_API = process.env.DOWNLOADS_API || "https://downloads-api-example.com";
 var fmt = require('util').format;
+var P = require('bluebird');
 var cache = P.promisifyAll(require('../lib/cache'));
 
 var Download = module.exports = function(opts) {
+  if (!(this instanceof Download)) {
+    return new Download(opts);
+  }
+
   _.extend(this, {
-    host: process.env.DOWNLOADS_API || "https://downloads-api-example.com",
     timeout: 2000,
+    bearer: opts && opts.loggedInUser && opts.loggedInUser.name
   }, opts);
+
   return this;
-};
-
-Download.new = function(request) {
-  var opts = {};
-
-  opts.bearer = request.loggedInuser && request.loggedInuser.name;
-
-  return new Download(opts);
 };
 
 Download.prototype.getDaily = function(packageName) {
@@ -47,7 +45,7 @@ Download.prototype.getAll = function(packageName) {
 
 Download.prototype.getSome = function(period, packageName) {
 
-  var url = fmt("%s/point/last-%s", this.host, period);
+  var url = fmt("%s/point/last-%s", DOWNLOADS_API, period);
   if (packageName) {
     url += "/" + packageName;
   }
