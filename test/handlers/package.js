@@ -270,7 +270,7 @@ describe("package handler", function() {
 
     it('includes a nice message about the nonexistent package', function(done) {
       expect(context.package).to.exist();
-      expect($("hgroup h2").text()).to.include("nothingness will be yours");
+      expect($(".titlegroup h2").text()).to.include("nothingness will be yours");
       done();
     });
 
@@ -434,7 +434,7 @@ describe("package handler", function() {
     });
 
     it("tells the user that package will be theirs", function(done) {
-      expect($("hgroup h2").text()).to.include("@bob/nope will be yours");
+      expect($(".titlegroup h2").text()).to.include("@bob/nope will be yours");
       done();
     });
 

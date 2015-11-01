@@ -2,7 +2,7 @@
 
 <div class="container{{#unless features.org_billing}} narrow{{/unless}}">
 
-  <header>
+  <div class="titlegroup">
     {{#if features.org_billing}}
       <h1>Subscriptions</h1>
     {{else}}
@@ -12,7 +12,7 @@
       <h1>sign up for private modules</h1>
       {{/if}}
     {{/if}}
-  </header>
+  </div>
 
   {{> email-verify-nag}}
 
